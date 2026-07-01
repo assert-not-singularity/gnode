@@ -165,10 +165,13 @@ def create_app(workspace: str | Path | None = None) -> FastAPI:
 
     @app.get("/api/graphs", response_model=list[GraphFileInfo])
     def list_graphs(request: Request) -> list[GraphFileInfo]:
-        """List the saved ``.gnode`` files in the workspace."""
+        """List the saved ``.gnode`` files in the workspace (regular files only)."""
         graphs_dir: Path = request.app.state.workspace.graphs_dir
+        resolved = graphs_dir.resolve()
         return [
-            GraphFileInfo(name=p.stem, filename=p.name) for p in sorted(graphs_dir.glob("*.gnode"))
+            GraphFileInfo(name=p.stem, filename=p.name)
+            for p in sorted(graphs_dir.glob("*.gnode"))
+            if p.is_file() and p.resolve().parent == resolved
         ]
 
     @app.post("/api/graphs", response_model=SaveGraphResult, status_code=201)
@@ -177,6 +180,8 @@ def create_app(workspace: str | Path | None = None) -> FastAPI:
         path = _safe_path(
             request.app.state.workspace.graphs_dir, req.filename.strip(), _GRAPH_FILE_RE
         )
+        if path.exists() and not path.is_file():
+            raise HTTPException(status_code=400, detail="target exists and is not a file")
         path.write_text(dump_graph(req.graph), encoding="utf-8")
         return SaveGraphResult(filename=path.name)
 

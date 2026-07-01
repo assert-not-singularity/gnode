@@ -51,3 +51,17 @@ def test_list_empty_workspace(tmp_path: Path) -> None:
     with TestClient(create_app(tmp_path)) as client:
         resp = client.get("/api/graphs")
     assert resp.json() == []
+
+
+def test_list_skips_directory_entries(tmp_path: Path) -> None:
+    with TestClient(create_app(tmp_path)) as client:
+        (tmp_path / "graphs" / "adir.gnode").mkdir()  # matches the glob but isn't a file
+        listing = client.get("/api/graphs").json()
+    assert all(g["filename"] != "adir.gnode" for g in listing)
+
+
+def test_save_over_directory_is_400(tmp_path: Path) -> None:
+    with TestClient(create_app(tmp_path)) as client:
+        (tmp_path / "graphs" / "demo.gnode").mkdir()
+        resp = client.post("/api/graphs", json={"filename": "demo.gnode", "graph": _GRAPH})
+    assert resp.status_code == 400
