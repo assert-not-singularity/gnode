@@ -30,8 +30,10 @@ if TYPE_CHECKING:
 # Vite dev server origins (frontend, M3). The built SPA is served same-origin.
 _DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
 _DEFAULT_WORKSPACE = ".gnode-workspace"
-_IMAGE_ID_RE = re.compile(r"[A-Za-z0-9]+\.[A-Za-z0-9]+")
 _ALLOWED_EXT = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
+# Serve only ids with a known image extension (mirrors _ALLOWED_EXT).
+_IMAGE_ID_RE = re.compile(r"[A-Za-z0-9]+\.(?:png|jpg|jpeg|webp|bmp)")
+_MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MB
 
 
 @asynccontextmanager
@@ -72,7 +74,9 @@ def create_app(workspace: str | Path | None = None) -> FastAPI:
     @app.post("/api/images", response_model=ImageUploadResponse)
     async def upload_image(request: Request, file: UploadFile) -> ImageUploadResponse:
         """Store an uploaded image and return a generated id + dimensions."""
-        data = await file.read()
+        data = await file.read(_MAX_UPLOAD_BYTES + 1)
+        if len(data) > _MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="image too large")
         try:
             image = decode_image_bytes(data)
         except Exception as exc:  # PIL raises assorted types on bad input

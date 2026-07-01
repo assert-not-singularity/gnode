@@ -6,10 +6,12 @@ import io
 from typing import TYPE_CHECKING
 
 import numpy as np
+import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
 from gnode.server.app import create_app
+from gnode.server.workspace import WorkspaceImageStore
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -53,3 +55,12 @@ def test_get_invalid_id_is_400(tmp_path: Path) -> None:
     with TestClient(create_app(tmp_path)) as client:
         resp = client.get("/api/images/nodothere")
     assert resp.status_code == 400
+
+
+def test_workspace_store_rejects_traversal(tmp_path: Path) -> None:
+    images = tmp_path / "images"
+    images.mkdir(parents=True, exist_ok=True)
+    store = WorkspaceImageStore(images)
+    for bad in ["../secret.png", "..", "sub/child.png", "/abs.png"]:
+        with pytest.raises(ValueError, match="image id"):
+            store.load(bad)

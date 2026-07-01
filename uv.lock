@@ -178,6 +178,7 @@ dev = [
 ]
 server = [
     { name = "fastapi" },
+    { name = "python-multipart" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -205,6 +206,7 @@ dev = [
 ]
 server = [
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "python-multipart", specifier = ">=0.0.9" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
 ]
 
