@@ -100,7 +100,9 @@ interface FieldProps {
 function Field({ name, prop, value, onChange }: FieldProps) {
   const { effective, nullable } = unwrap(prop)
   const label = effective.title ?? name
-  const current = value ?? effective.default
+  // Only fall back to the default when the value was never set; an explicit
+  // null must survive (so nullable fields can render as "none"/empty).
+  const current = value === undefined ? effective.default : value
   const id = `param-${name}`
 
   const labelEl = (
@@ -219,7 +221,11 @@ function Field({ name, prop, value, onChange }: FieldProps) {
         <select
           id={id}
           value={String(current ?? '')}
-          onChange={(e) => onChange(numeric ? Number(e.target.value) : e.target.value)}
+          onChange={(e) => {
+            const v = e.target.value
+            if (v === '') return onChange(null)
+            onChange(numeric ? Number(v) : v)
+          }}
         >
           {nullable && <option value="">— none —</option>}
           {effective.enum.map((opt) => (
@@ -259,7 +265,11 @@ function Field({ name, prop, value, onChange }: FieldProps) {
             max={effective.max}
             step={effective.step}
             value={typeof current === 'number' ? current : ''}
-            onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+            onChange={(e) => {
+              const raw = e.target.value
+              if (raw === '') return onChange(nullable ? null : (effective.default ?? 0))
+              onChange(Number(raw))
+            }}
           />
         </div>
       )
