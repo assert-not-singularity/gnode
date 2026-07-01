@@ -27,6 +27,7 @@ htmlcov/
 
 # gnode runtime
 *.gnode.cache
+.gnode-workspace/
 
 # Claude Code agent worktrees
 .claude/worktrees/
