@@ -45,3 +45,21 @@ class EvaluateResponse(BaseModel):
 
     previews: dict[str, NodePreview] = Field(default_factory=dict)
     errors: dict[str, str] = Field(default_factory=dict)
+
+
+class GraphFileInfo(BaseModel):
+    """A saved ``.gnode`` file in the workspace."""
+
+    name: str
+    filename: str
+
+
+class SaveGraphRequest(BaseModel):
+    """Body of ``POST /api/graphs``."""
+
+    filename: str
+    graph: Graph
+
+
+class SaveGraphResult(BaseModel):
+    filename: str
