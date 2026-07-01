@@ -1,23 +1,30 @@
 """Evaluation context (plan §3.2, §3.5).
 
-A thin data holder + rng factory passed to every ``evaluate``. Deliberately
-small: it carries the global seed, target resolution, an optional progress
-callback, and a cancellation token — nothing node-specific.
+Two thin dataclasses:
+
+* ``Context`` — graph-level, passed to ``Engine.evaluate`` (global seed, target
+  resolution, injected image store, progress + cancellation).
+* ``NodeContext`` — per-node, built by the engine and handed to ``evaluate``. It
+  carries a *pre-seeded* rng and the resolved seed so nodes never re-implement
+  seed precedence and never touch global ``np.random``.
 """
 
 from __future__ import annotations
 
 import threading
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from gnode.core import rng
 from gnode.core.errors import EvaluationCancelledError
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
+    from typing import Any
 
     import numpy as np
+
+    from gnode.core.ports import ImageStore
 
 
 @dataclass
@@ -40,13 +47,13 @@ class CancellationToken:
 
 @dataclass
 class Context:
+    """Graph-level evaluation context passed to ``Engine.evaluate``."""
+
     seed: int = 0
     resolution: tuple[int, int] = (768, 768)
+    store: ImageStore | None = None
     progress: Callable[[str, float], None] | None = None
     cancel: CancellationToken = field(default_factory=CancellationToken)
-
-    def rng_for(self, node_id: str, node_seed: int | None = None) -> np.random.Generator:
-        return rng.rng_for(self.seed, node_id, node_seed)
 
     def resolve_seed(
         self, node_id: str, inputs: Mapping[str, Any] | None = None, param_seed: int | None = None
@@ -59,3 +66,16 @@ class Context:
         if param_seed is not None:
             return int(param_seed)
         return rng.derive_seed(self.seed, node_id)
+
+
+@dataclass
+class NodeContext:
+    """Per-node context handed to ``evaluate``."""
+
+    node_id: str
+    seed: int
+    resolution: tuple[int, int]
+    rng: np.random.Generator
+    store: ImageStore | None = None
+    progress: Callable[[str, float], None] | None = None
+    cancel: CancellationToken = field(default_factory=CancellationToken)

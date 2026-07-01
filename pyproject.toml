@@ -51,7 +51,8 @@ select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "PT", "PTH", "TID", "
 # RET returns · TC type-checking-imports · ARG unused-args · RUF ruff-native
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["ARG"]                       # pytest fixtures are injected as args
+"tests/**" = ["ARG", "RUF012"]             # fixtures injected as args; node metadata dicts
+"src/gnode/nodes/**" = ["RUF012"]          # inputs/outputs are class-level metadata (never mutated)
 "src/gnode/core/params.py" = ["N802"]      # widget-field factories read like types
 # lib/ is vendored/validated numerics — keep real-bug lints (F, E9, most B) but
 # silence style rules so we don't churn the math (short names, int(round()), etc.).
