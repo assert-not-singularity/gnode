@@ -17,19 +17,23 @@ from typing import TYPE_CHECKING, Any
 from fastapi import FastAPI, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from pydantic import ValidationError
 
 from gnode.core import registry
 from gnode.core.context import Context
 from gnode.core.engine import Engine
 from gnode.core.errors import NodeContractError, NodeEvalError
-from gnode.core.graph import Graph  # noqa: TC001 — FastAPI resolves this annotation at runtime
+from gnode.core.graph import Graph, dump_graph, load_graph_file
 from gnode.core.image import decode_image_bytes
 from gnode.core.validation import validate_graph
 from gnode.server.preview import preview_of
 from gnode.server.schemas import (
     EvaluateRequest,
     EvaluateResponse,
+    GraphFileInfo,
     ImageUploadResponse,
+    SaveGraphRequest,
+    SaveGraphResult,
     ValidationResponse,
 )
 from gnode.server.workspace import Workspace
@@ -44,6 +48,17 @@ _ALLOWED_EXT = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 # Serve only ids with a known image extension (mirrors _ALLOWED_EXT).
 _IMAGE_ID_RE = re.compile(r"[A-Za-z0-9]+\.(?:png|jpg|jpeg|webp|bmp)")
 _MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MB
+_GRAPH_FILE_RE = re.compile(r"[A-Za-z0-9._-]+\.gnode")
+
+
+def _safe_path(directory: Path, filename: str, pattern: re.Pattern[str]) -> Path:
+    """Resolve ``filename`` inside ``directory``, rejecting bad names or traversal."""
+    if not pattern.fullmatch(filename):
+        raise HTTPException(status_code=400, detail="invalid filename")
+    path = (directory / filename).resolve()
+    if path.parent != directory.resolve():
+        raise HTTPException(status_code=400, detail="invalid filename")
+    return path
 
 
 @asynccontextmanager
@@ -147,6 +162,34 @@ def create_app(workspace: str | Path | None = None) -> FastAPI:
             if (preview := preview_of(node_out)) is not None
         }
         return EvaluateResponse(previews=previews)
+
+    @app.get("/api/graphs", response_model=list[GraphFileInfo])
+    def list_graphs(request: Request) -> list[GraphFileInfo]:
+        """List the saved ``.gnode`` files in the workspace."""
+        graphs_dir: Path = request.app.state.workspace.graphs_dir
+        return [
+            GraphFileInfo(name=p.stem, filename=p.name) for p in sorted(graphs_dir.glob("*.gnode"))
+        ]
+
+    @app.post("/api/graphs", response_model=SaveGraphResult, status_code=201)
+    def save_graph(req: SaveGraphRequest, request: Request) -> SaveGraphResult:
+        """Save a graph to ``workspace/graphs/<filename>`` (validated filename)."""
+        path = _safe_path(
+            request.app.state.workspace.graphs_dir, req.filename.strip(), _GRAPH_FILE_RE
+        )
+        path.write_text(dump_graph(req.graph), encoding="utf-8")
+        return SaveGraphResult(filename=path.name)
+
+    @app.get("/api/graphs/{filename}", response_model=Graph)
+    def get_graph(filename: str, request: Request) -> Graph:
+        """Load a saved ``.gnode`` file and return the graph."""
+        path = _safe_path(request.app.state.workspace.graphs_dir, filename, _GRAPH_FILE_RE)
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="graph not found")
+        try:
+            return load_graph_file(path)
+        except (ValueError, ValidationError) as exc:
+            raise HTTPException(status_code=400, detail="invalid .gnode file") from exc
 
     return app
 
