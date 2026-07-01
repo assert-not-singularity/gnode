@@ -11,3 +11,11 @@ class ValidationResponse(BaseModel):
     valid: bool
     errors: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+
+
+class ImageUploadResponse(BaseModel):
+    """Result of ``POST /api/images``."""
+
+    image_id: str
+    width: int
+    height: int
