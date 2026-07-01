@@ -147,6 +147,7 @@ dependencies = [
     { name = "imageio" },
     { name = "numpy" },
     { name = "pillow" },
+    { name = "pydantic" },
 ]
 
 [package.optional-dependencies]
@@ -172,6 +173,7 @@ requires-dist = [
     { name = "imageio", specifier = ">=2.34" },
     { name = "numpy", specifier = ">=2.1" },
     { name = "pillow", specifier = ">=10.4" },
+    { name = "pydantic", specifier = ">=2.7" },
     { name = "scipy", marker = "extra == 'scipy'", specifier = ">=1.13" },
 ]
 provides-extras = ["scipy"]
