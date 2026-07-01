@@ -6,6 +6,7 @@ import {
   type Edge,
   type IsValidConnection,
   MiniMap,
+  type NodeMouseHandler,
   ReactFlow,
   ReactFlowProvider,
   useEdgesState,
@@ -13,8 +14,9 @@ import {
   useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { type DragEvent, useCallback, useMemo, useRef } from 'react'
+import { type DragEvent, useCallback, useMemo, useRef, useState } from 'react'
 import './App.css'
+import { ConfigPanel } from './components/ConfigPanel'
 import { GlitchNode, type GlitchNodeType } from './components/GlitchNode'
 import { Palette } from './components/Palette'
 import { useNodes } from './hooks/useNodes'
@@ -33,6 +35,7 @@ function Editor() {
 
   const [nodes, setNodes, onNodesChange] = useNodesState<GlitchNodeType>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const { screenToFlowPosition } = useReactFlow()
   const canvasRef = useRef<HTMLDivElement>(null)
 
@@ -104,6 +107,23 @@ function Editor() {
     [setEdges],
   )
 
+  const onNodeClick: NodeMouseHandler<GlitchNodeType> = useCallback(
+    (_event, node) => setSelectedId(node.id),
+    [],
+  )
+  const onPaneClick = useCallback(() => setSelectedId(null), [])
+
+  const setParams = useCallback(
+    (nodeId: string, params: Record<string, unknown>) => {
+      setNodes((current) =>
+        current.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, params } } : n)),
+      )
+    },
+    [setNodes],
+  )
+
+  const selected = selectedId ? nodes.find((n) => n.id === selectedId) : undefined
+
   return (
     <div className="app">
       <header className="app-header">
@@ -111,7 +131,10 @@ function Editor() {
         <span className="app-title">gnode</span>
         <span className="app-tag">node-based glitch editor</span>
       </header>
-      <div className="editor">
+      <div
+        className="editor"
+        style={{ gridTemplateColumns: selected ? '240px 1fr 300px' : '240px 1fr' }}
+      >
         <Palette catalog={catalog} loading={loading} error={error} onAdd={addFromPalette} />
         {/* biome-ignore lint/a11y/noStaticElementInteractions: the canvas is a drag-and-drop drop target; keyboard interaction is handled by React Flow */}
         <div className="canvas" ref={canvasRef} onDrop={onDrop} onDragOver={onDragOver}>
@@ -121,6 +144,8 @@ function Editor() {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onNodeClick={onNodeClick}
+            onPaneClick={onPaneClick}
             isValidConnection={isValidConnection}
             nodeTypes={nodeTypes}
             defaultViewport={{ x: 0, y: 0, zoom: 1 }}
@@ -132,6 +157,17 @@ function Editor() {
             <MiniMap zoomable pannable nodeColor="#334155" maskColor="rgba(0,0,0,0.6)" />
           </ReactFlow>
         </div>
+        {selected && (
+          <ConfigPanel
+            key={selected.id}
+            nodeId={selected.id}
+            title={selected.data.descriptor.title}
+            schema={selected.data.descriptor.params_schema}
+            params={selected.data.params}
+            onChange={(params) => setParams(selected.id, params)}
+            onClose={() => setSelectedId(null)}
+          />
+        )}
       </div>
     </div>
   )
