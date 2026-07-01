@@ -17,6 +17,7 @@ help:
 	@echo ""
 	@echo "Run"
 	@echo "  render FILE=graph.gnode OUT=out.png   Render a .gnode to PNG"
+	@echo "  serve         Start the FastAPI service on 127.0.0.1:8080"
 
 .PHONY: setup
 setup:
@@ -48,3 +49,7 @@ test:
 .PHONY: render
 render:
 	$(UV) run gnode render $(FILE) -o $(OUT)
+
+.PHONY: serve
+serve:
+	$(UV) run --group server python -m gnode.server
