@@ -10,16 +10,16 @@ export interface GlitchNodeData {
 
 export type GlitchNodeType = Node<GlitchNodeData, 'glitchNode'>
 
-/** A canvas node: header (id + type) with typed input handles on the left and
- * output handles on the right, coloured per port type (colours come from the
- * backend catalog). */
+/** A canvas node: header (the node id + its human title) with typed input
+ * handles on the left and output handles on the right, coloured per port type
+ * (colours come from the backend catalog). */
 export function GlitchNode({ data, selected }: NodeProps<GlitchNodeType>) {
   const { descriptor, label } = data
   return (
     <div className={`glitch-node${selected ? ' selected' : ''}`}>
       <div className="node-header">
         <span className="node-label">{label}</span>
-        {label !== descriptor.title && <span className="node-type">{descriptor.title}</span>}
+        {label !== descriptor.title && <span className="node-subtitle">{descriptor.title}</span>}
       </div>
       <div className="node-body">
         <div className="ports inputs">

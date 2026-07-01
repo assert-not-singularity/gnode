@@ -36,6 +36,7 @@ export function Palette({ catalog, loading, error, onAdd }: PaletteProps) {
     <aside className="palette">
       <input
         className="palette-search"
+        aria-label="Search nodes"
         placeholder="Search nodes…"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
@@ -54,8 +55,8 @@ export function Palette({ catalog, loading, error, onAdd }: PaletteProps) {
                 className="palette-item"
                 draggable
                 onDragStart={(e) => onDragStart(e, node.type)}
-                onDoubleClick={() => onAdd(node)}
-                title={`${node.type} — drag onto the canvas or double-click to add`}
+                onClick={() => onAdd(node)}
+                title={`${node.type} — click or drag onto the canvas to add`}
               >
                 {node.title}
               </button>
