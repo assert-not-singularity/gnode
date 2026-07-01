@@ -1,19 +1,108 @@
-import { useMemo } from 'react'
+import {
+  addEdge,
+  Background,
+  type Connection,
+  Controls,
+  type Edge,
+  type IsValidConnection,
+  MiniMap,
+  ReactFlow,
+  ReactFlowProvider,
+  useEdgesState,
+  useNodesState,
+  useReactFlow,
+} from '@xyflow/react'
+import '@xyflow/react/dist/style.css'
+import { type DragEvent, useCallback, useMemo, useRef } from 'react'
 import './App.css'
+import { GlitchNode, type GlitchNodeType } from './components/GlitchNode'
+import { Palette } from './components/Palette'
 import { useNodes } from './hooks/useNodes'
+import type { NodeDescriptor } from './types'
 
-export default function App() {
-  const { nodes, loading, error } = useNodes()
+const nodeTypes = { glitchNode: GlitchNode }
 
-  const byCategory = useMemo(() => {
-    const map = new Map<string, { type: string; title: string }[]>()
-    for (const node of nodes) {
-      const list = map.get(node.category) ?? []
-      list.push({ type: node.type, title: node.title })
-      map.set(node.category, list)
-    }
-    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b))
-  }, [nodes])
+/** Short base name for a node id, e.g. "displace.band" -> "band". */
+function baseName(type: string): string {
+  return type.split('.').pop() ?? type
+}
+
+function Editor() {
+  const { nodes: catalog, loading, error } = useNodes()
+  const byType = useMemo(() => new Map(catalog.map((n) => [n.type, n])), [catalog])
+
+  const [nodes, setNodes, onNodesChange] = useNodesState<GlitchNodeType>([])
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
+  const { screenToFlowPosition } = useReactFlow()
+  const canvasRef = useRef<HTMLDivElement>(null)
+
+  const addNode = useCallback(
+    (descriptor: NodeDescriptor, position: { x: number; y: number }) => {
+      setNodes((current) => {
+        const ids = new Set(current.map((n) => n.id))
+        const base = baseName(descriptor.type)
+        let i = 1
+        while (ids.has(`${base}_${i}`)) i++
+        const id = `${base}_${i}`
+        const node: GlitchNodeType = {
+          id,
+          type: 'glitchNode',
+          position,
+          data: { descriptor, label: id, params: {} },
+        }
+        return [...current, node]
+      })
+    },
+    [setNodes],
+  )
+
+  const addFromPalette = useCallback(
+    (descriptor: NodeDescriptor) => {
+      const bounds = canvasRef.current?.getBoundingClientRect()
+      const jitter = () => (Math.random() - 0.5) * 90
+      const position = bounds
+        ? screenToFlowPosition({
+            x: bounds.x + bounds.width / 2 + jitter(),
+            y: bounds.y + bounds.height / 3 + jitter(),
+          })
+        : { x: 200, y: 150 }
+      addNode(descriptor, position)
+    },
+    [addNode, screenToFlowPosition],
+  )
+
+  const onDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+  }, [])
+
+  const onDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      event.preventDefault()
+      const descriptor = byType.get(event.dataTransfer.getData('application/gnode'))
+      if (!descriptor) return
+      addNode(descriptor, screenToFlowPosition({ x: event.clientX, y: event.clientY }))
+    },
+    [byType, addNode, screenToFlowPosition],
+  )
+
+  // Mirrors the backend's can_connect policy: exact type match, ANY as wildcard.
+  const isValidConnection: IsValidConnection<Edge> = useCallback(
+    (conn) => {
+      const source = nodes.find((n) => n.id === conn.source)
+      const target = nodes.find((n) => n.id === conn.target)
+      const out = source?.data.descriptor.outputs.find((p) => p.name === conn.sourceHandle)
+      const inp = target?.data.descriptor.inputs.find((p) => p.name === conn.targetHandle)
+      if (!out || !inp) return false
+      return out.type === 'ANY' || inp.type === 'ANY' || out.type === inp.type
+    },
+    [nodes],
+  )
+
+  const onConnect = useCallback(
+    (conn: Connection) => setEdges((eds) => addEdge(conn, eds)),
+    [setEdges],
+  )
 
   return (
     <div className="app">
@@ -22,35 +111,36 @@ export default function App() {
         <span className="app-title">gnode</span>
         <span className="app-tag">node-based glitch editor</span>
       </header>
-
-      <main className="app-body">
-        {loading && <p className="muted">Loading node catalog…</p>}
-        {error && (
-          <p className="error">
-            Could not load the catalog ({error}). Is the backend running? Start it with{' '}
-            <code>make serve</code>.
-          </p>
-        )}
-        {!loading && !error && (
-          <>
-            <p className="muted">
-              {nodes.length} nodes across {byCategory.length} categories
-            </p>
-            <div className="catalog">
-              {byCategory.map(([category, items]) => (
-                <section key={category} className="cat">
-                  <h2>{category}</h2>
-                  <ul>
-                    {items.map((node) => (
-                      <li key={node.type}>{node.title}</li>
-                    ))}
-                  </ul>
-                </section>
-              ))}
-            </div>
-          </>
-        )}
-      </main>
+      <div className="editor">
+        <Palette catalog={catalog} loading={loading} error={error} onAdd={addFromPalette} />
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: the canvas is a drag-and-drop drop target; keyboard interaction is handled by React Flow */}
+        <div className="canvas" ref={canvasRef} onDrop={onDrop} onDragOver={onDragOver}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            isValidConnection={isValidConnection}
+            nodeTypes={nodeTypes}
+            defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+            minZoom={0.2}
+            deleteKeyCode={['Backspace', 'Delete']}
+          >
+            <Background gap={16} size={1} color="#1e293b" />
+            <Controls />
+            <MiniMap zoomable pannable nodeColor="#334155" maskColor="rgba(0,0,0,0.6)" />
+          </ReactFlow>
+        </div>
+      </div>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <ReactFlowProvider>
+      <Editor />
+    </ReactFlowProvider>
   )
 }
