@@ -1,0 +1,74 @@
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #0b0f14;
+  color: #e2e8f0;
+}
+
+.app-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.8rem 1.2rem;
+  border-bottom: 1px solid #1e293b;
+}
+
+.app-logo {
+  color: #38bdf8;
+  font-size: 1.3rem;
+}
+
+.app-title {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.app-tag {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.app-body {
+  padding: 1.2rem;
+}
+
+.muted {
+  color: #94a3b8;
+}
+
+.error {
+  color: #fb7185;
+}
+
+code {
+  font-family: ui-monospace, Consolas, monospace;
+  background: #1e293b;
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+}
+
+.catalog {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.cat h2 {
+  font-size: 0.9rem;
+  color: #38bdf8;
+  margin: 0 0 0.4rem;
+}
+
+.cat ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.cat li {
+  padding: 0.15rem 0;
+  color: #cbd5e1;
+  font-size: 0.85rem;
+}

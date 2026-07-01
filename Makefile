@@ -53,3 +53,18 @@ render:
 .PHONY: serve
 serve:
 	$(UV) run --group server python -m gnode.server
+
+# ── Frontend (Milestone 3) ────────────────────────────────────────────────────
+
+.PHONY: front-install front-dev front-build front-check
+front-install:
+	cd frontend && npm ci
+
+front-dev:
+	cd frontend && npm run dev
+
+front-build:
+	cd frontend && npm run build
+
+front-check:
+	cd frontend && npm run check
