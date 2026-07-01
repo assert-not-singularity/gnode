@@ -1,3 +1,5 @@
+import { type ChangeEvent, useState } from 'react'
+import { uploadImage } from '../api/client'
 import type { JsonSchema, JsonSchemaProperty } from '../types'
 
 interface ConfigPanelProps {
@@ -104,6 +106,10 @@ function Field({ name, prop, value, onChange }: FieldProps) {
   // null must survive (so nullable fields can render as "none"/empty).
   const current = value === undefined ? effective.default : value
   const id = `param-${name}`
+
+  if (name === 'image_id') {
+    return <ImageIdField id={id} label={label} value={current} onChange={onChange} />
+  }
 
   const labelEl = (
     <label htmlFor={id}>
@@ -288,6 +294,60 @@ function Field({ name, prop, value, onChange }: FieldProps) {
     default:
       return <JsonField id={id} label={label} value={current} onChange={onChange} />
   }
+}
+
+/** Upload an image and store the returned id (used for `io.load_image`). */
+function ImageIdField({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string
+  label: string
+  value: unknown
+  onChange: (value: unknown) => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState<string | null>(null)
+
+  const onFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    // Reset so picking the same file again still fires onChange.
+    event.target.value = ''
+    if (!file) return
+    setBusy(true)
+    setFailed(null)
+    try {
+      const result = await uploadImage(file)
+      onChange(result.image_id)
+    } catch (err) {
+      setFailed(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      <input
+        id={id}
+        type="text"
+        placeholder="image id (or upload)"
+        value={typeof value === 'string' ? value : ''}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <div className="field-row upload-row">
+        <label className="upload-btn">
+          upload…
+          <input type="file" accept="image/*" onChange={onFile} hidden />
+        </label>
+        {busy && <span className="muted small">uploading…</span>}
+        {failed && <span className="error small">{failed}</span>}
+      </div>
+    </div>
+  )
 }
 
 /** Fallback for arrays/objects (e.g. gradient-map stops): edit as JSON. */

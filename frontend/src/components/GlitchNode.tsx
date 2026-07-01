@@ -1,4 +1,6 @@
 import { Handle, type Node, type NodeProps, Position } from '@xyflow/react'
+import { useContext } from 'react'
+import { PreviewContext } from '../contexts'
 import type { NodeDescriptor } from '../types'
 
 export interface GlitchNodeData {
@@ -10,13 +12,20 @@ export interface GlitchNodeData {
 
 export type GlitchNodeType = Node<GlitchNodeData, 'glitchNode'>
 
-/** A canvas node: header (the node id + its human title) with typed input
- * handles on the left and output handles on the right, coloured per port type
- * (colours come from the backend catalog). */
-export function GlitchNode({ data, selected }: NodeProps<GlitchNodeType>) {
+/** A canvas node: header (the node id + its human title), typed input handles on
+ * the left and output handles on the right (coloured per port type), and a live
+ * preview thumbnail / error border from the last evaluate. */
+export function GlitchNode({ id, data, selected }: NodeProps<GlitchNodeType>) {
   const { descriptor, label } = data
+  const { previews, errors } = useContext(PreviewContext)
+  const preview = previews[id]
+  const error = errors[id]
+
   return (
-    <div className={`glitch-node${selected ? ' selected' : ''}`}>
+    <div
+      className={`glitch-node${selected ? ' selected' : ''}${error ? ' errored' : ''}`}
+      title={error}
+    >
       <div className="node-header">
         <span className="node-label">{label}</span>
         {label !== descriptor.title && <span className="node-subtitle">{descriptor.title}</span>}
@@ -50,6 +59,15 @@ export function GlitchNode({ data, selected }: NodeProps<GlitchNodeType>) {
           ))}
         </div>
       </div>
+      {preview && (
+        <img
+          className="node-thumb"
+          src={preview.data_url}
+          alt={`${label} preview`}
+          draggable={false}
+        />
+      )}
+      {error && <div className="node-error">{error}</div>}
     </div>
   )
 }

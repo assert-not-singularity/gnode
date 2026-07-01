@@ -14,15 +14,20 @@ import {
   useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { type DragEvent, useCallback, useMemo, useRef, useState } from 'react'
+import { type DragEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
+import { evaluateGraph } from './api/client'
 import { ConfigPanel } from './components/ConfigPanel'
 import { GlitchNode, type GlitchNodeType } from './components/GlitchNode'
 import { Palette } from './components/Palette'
+import { Toolbar } from './components/Toolbar'
+import { PreviewContext } from './contexts'
+import { toGnodeGraph } from './graph'
 import { useNodes } from './hooks/useNodes'
-import type { NodeDescriptor } from './types'
+import type { NodeDescriptor, NodePreview } from './types'
 
 const nodeTypes = { glitchNode: GlitchNode }
+const DEBOUNCE_MS = 350
 
 /** Short base name for a node id, e.g. "displace.band" -> "band". */
 function baseName(type: string): string {
@@ -36,6 +41,12 @@ function Editor() {
   const [nodes, setNodes, onNodesChange] = useNodesState<GlitchNodeType>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [seed, setSeed] = useState(1)
+  const [resolution, setResolution] = useState<[number, number]>([512, 512])
+  const [previews, setPreviews] = useState<Record<string, NodePreview>>({})
+  const [nodeErrors, setNodeErrors] = useState<Record<string, string>>({})
+  const [issues, setIssues] = useState<string[]>([])
+  const [status, setStatus] = useState('')
   const { screenToFlowPosition } = useReactFlow()
   const canvasRef = useRef<HTMLDivElement>(null)
 
@@ -122,6 +133,60 @@ function Editor() {
     [setNodes],
   )
 
+  // Latest graph, read by the debounced evaluate without being a hook dependency.
+  const graphRef = useRef({ nodes, edges, seed, resolution })
+  graphRef.current = { nodes, edges, seed, resolution }
+
+  // A signature of everything that affects the *output* (not node positions).
+  const evalKey = useMemo(
+    () =>
+      JSON.stringify({
+        n: nodes.map((n) => [n.id, n.data.descriptor.type, n.data.params]),
+        e: edges.map((e) => [e.source, e.sourceHandle, e.target, e.targetHandle]),
+        seed,
+        resolution,
+      }),
+    [nodes, edges, seed, resolution],
+  )
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional debounce keyed on evalKey; the latest graph is read via graphRef.
+  useEffect(() => {
+    const current = graphRef.current
+    if (current.nodes.length === 0) {
+      setPreviews({})
+      setNodeErrors({})
+      setIssues([])
+      setStatus('')
+      return
+    }
+    let stale = false
+    setStatus('evaluating')
+    const timer = setTimeout(() => {
+      const { nodes: ns, edges: es, seed: sd, resolution: res } = graphRef.current
+      const targets = ns.map((n) => n.id)
+      evaluateGraph(toGnodeGraph(ns, es, sd, res), targets)
+        .then((result) => {
+          if (stale) return
+          setPreviews(result.previews)
+          setNodeErrors(result.errors)
+          setIssues([])
+          setStatus(Object.keys(result.errors).length > 0 ? 'node error' : 'ready')
+        })
+        .catch((err: unknown) => {
+          if (stale) return
+          setPreviews({})
+          setNodeErrors({})
+          setIssues([err instanceof Error ? err.message : String(err)])
+          setStatus('invalid')
+        })
+    }, DEBOUNCE_MS)
+    return () => {
+      stale = true
+      clearTimeout(timer)
+    }
+  }, [evalKey])
+
+  const previewState = useMemo(() => ({ previews, errors: nodeErrors }), [previews, nodeErrors])
   const selected = selectedId ? nodes.find((n) => n.id === selectedId) : undefined
 
   return (
@@ -129,8 +194,23 @@ function Editor() {
       <header className="app-header">
         <span className="app-logo">⬡</span>
         <span className="app-title">gnode</span>
-        <span className="app-tag">node-based glitch editor</span>
+        <Toolbar
+          seed={seed}
+          onSeed={setSeed}
+          resolution={resolution}
+          onResolution={setResolution}
+          status={status}
+        />
       </header>
+      {issues.length > 0 && (
+        <div className="validation-bar">
+          {issues.map((msg) => (
+            <span key={msg} className="issue">
+              {msg}
+            </span>
+          ))}
+        </div>
+      )}
       <div
         className="editor"
         style={{ gridTemplateColumns: selected ? '240px 1fr 300px' : '240px 1fr' }}
@@ -138,24 +218,26 @@ function Editor() {
         <Palette catalog={catalog} loading={loading} error={error} onAdd={addFromPalette} />
         {/* biome-ignore lint/a11y/noStaticElementInteractions: the canvas is a drag-and-drop drop target; keyboard interaction is handled by React Flow */}
         <div className="canvas" ref={canvasRef} onDrop={onDrop} onDragOver={onDragOver}>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={onNodeClick}
-            onPaneClick={onPaneClick}
-            isValidConnection={isValidConnection}
-            nodeTypes={nodeTypes}
-            defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-            minZoom={0.2}
-            deleteKeyCode={['Backspace', 'Delete']}
-          >
-            <Background gap={16} size={1} color="#1e293b" />
-            <Controls />
-            <MiniMap zoomable pannable nodeColor="#334155" maskColor="rgba(0,0,0,0.6)" />
-          </ReactFlow>
+          <PreviewContext.Provider value={previewState}>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onNodeClick={onNodeClick}
+              onPaneClick={onPaneClick}
+              isValidConnection={isValidConnection}
+              nodeTypes={nodeTypes}
+              defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+              minZoom={0.2}
+              deleteKeyCode={['Backspace', 'Delete']}
+            >
+              <Background gap={16} size={1} color="#1e293b" />
+              <Controls />
+              <MiniMap zoomable pannable nodeColor="#334155" maskColor="rgba(0,0,0,0.6)" />
+            </ReactFlow>
+          </PreviewContext.Provider>
         </div>
         {selected && (
           <ConfigPanel
