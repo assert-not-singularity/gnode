@@ -94,7 +94,10 @@ class Engine:
             )
             try:
                 result = node.run(in_values, params, node_ctx)
-            except (EvaluationCancelledError, NodeContractError):
+            except EvaluationCancelledError:
+                raise
+            except NodeContractError as exc:
+                exc.node_id = node_id  # attribute the contract violation to this node
                 raise
             except Exception as exc:
                 raise NodeEvalError(node_id, cls.type, str(exc)) from exc

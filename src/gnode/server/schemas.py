@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from gnode.core.graph import Graph
+
 
 class ValidationResponse(BaseModel):
     """Result of ``POST /api/validate``."""
@@ -19,3 +21,27 @@ class ImageUploadResponse(BaseModel):
     image_id: str
     width: int
     height: int
+
+
+class NodePreview(BaseModel):
+    """A rendered preview of one node's output."""
+
+    port: str
+    kind: str  # "image" | "map"
+    data_url: str
+    width: int
+    height: int
+
+
+class EvaluateRequest(BaseModel):
+    """Body of ``POST /api/evaluate``."""
+
+    graph: Graph
+    targets: list[str]
+
+
+class EvaluateResponse(BaseModel):
+    """Previews per requested target, plus any per-node evaluation error."""
+
+    previews: dict[str, NodePreview] = Field(default_factory=dict)
+    errors: dict[str, str] = Field(default_factory=dict)

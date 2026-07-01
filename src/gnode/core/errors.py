@@ -26,7 +26,12 @@ class NodeEvalError(GnodeError):
 
 class NodeContractError(GnodeError):
     """A node (or a value crossing a boundary) violated the declared contract:
-    wrong output ports, wrong dtype/shape, or a mutated input."""
+    wrong output ports, wrong dtype/shape, or a mutated input.
+
+    ``node_id`` is attached by the engine when the violation surfaces during a
+    graph evaluation, so callers can attribute it to a specific node."""
+
+    node_id: str | None = None
 
 
 class EvaluationCancelledError(GnodeError):

@@ -6,6 +6,7 @@ Evaluate/preview and the graph workspace land in later work items.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 import uuid
@@ -18,10 +19,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from gnode.core import registry
+from gnode.core.context import Context
+from gnode.core.engine import Engine
+from gnode.core.errors import NodeContractError, NodeEvalError
 from gnode.core.graph import Graph  # noqa: TC001 — FastAPI resolves this annotation at runtime
 from gnode.core.image import decode_image_bytes
 from gnode.core.validation import validate_graph
-from gnode.server.schemas import ImageUploadResponse, ValidationResponse
+from gnode.server.preview import preview_of
+from gnode.server.schemas import (
+    EvaluateRequest,
+    EvaluateResponse,
+    ImageUploadResponse,
+    ValidationResponse,
+)
 from gnode.server.workspace import Workspace
 
 if TYPE_CHECKING:
@@ -42,6 +52,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     registry.discover()
     app.state.catalog = registry.catalog()
     app.state.workspace = Workspace(app.state.workspace_root)
+    app.state.engine = Engine()  # persistent cache reused across requests
     yield
 
 
@@ -98,6 +109,44 @@ def create_app(workspace: str | Path | None = None) -> FastAPI:
         if not path.is_file():
             raise HTTPException(status_code=404, detail="image not found")
         return FileResponse(path)
+
+    @app.post("/api/evaluate", response_model=EvaluateResponse)
+    async def evaluate(req: EvaluateRequest, request: Request) -> EvaluateResponse:
+        """Evaluate the graph for the requested targets, returning preview PNGs.
+
+        The CPU-bound engine runs in a threadpool so the event loop stays free;
+        the persistent engine cache is reused across requests (fast slider drags).
+        """
+        result = validate_graph(req.graph)
+        if not result.valid:
+            raise HTTPException(status_code=400, detail={"errors": result.errors})
+        node_ids = {n.id for n in req.graph.nodes}
+        missing = [t for t in req.targets if t not in node_ids]
+        if missing:
+            raise HTTPException(
+                status_code=400, detail={"errors": [f"unknown target '{t}'" for t in missing]}
+            )
+
+        engine: Engine = request.app.state.engine
+        ctx = Context(
+            seed=req.graph.meta.seed,
+            resolution=tuple(req.graph.meta.resolution),
+            store=request.app.state.workspace.image_store,
+        )
+        loop = asyncio.get_running_loop()
+        try:
+            outputs = await loop.run_in_executor(None, engine.evaluate, req.graph, req.targets, ctx)
+        except NodeEvalError as exc:
+            return EvaluateResponse(errors={exc.node_id: str(exc)})
+        except NodeContractError as exc:
+            return EvaluateResponse(errors={exc.node_id or "graph": str(exc)})
+
+        previews = {
+            node_id: preview
+            for node_id, node_out in outputs.items()
+            if (preview := preview_of(node_out)) is not None
+        }
+        return EvaluateResponse(previews=previews)
 
     return app
 
