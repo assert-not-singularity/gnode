@@ -159,25 +159,31 @@ function Editor() {
       setStatus('')
       return
     }
+    let stale = false
     setStatus('evaluating')
     const timer = setTimeout(() => {
       const { nodes: ns, edges: es, seed: sd, resolution: res } = graphRef.current
       const targets = ns.map((n) => n.id)
       evaluateGraph(toGnodeGraph(ns, es, sd, res), targets)
         .then((result) => {
+          if (stale) return
           setPreviews(result.previews)
           setNodeErrors(result.errors)
           setIssues([])
           setStatus(Object.keys(result.errors).length > 0 ? 'node error' : 'ready')
         })
         .catch((err: unknown) => {
+          if (stale) return
           setPreviews({})
           setNodeErrors({})
           setIssues([err instanceof Error ? err.message : String(err)])
           setStatus('invalid')
         })
     }, DEBOUNCE_MS)
-    return () => clearTimeout(timer)
+    return () => {
+      stale = true
+      clearTimeout(timer)
+    }
   }, [evalKey])
 
   const previewState = useMemo(() => ({ previews, errors: nodeErrors }), [previews, nodeErrors])

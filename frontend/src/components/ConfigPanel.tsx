@@ -313,6 +313,8 @@ function ImageIdField({
 
   const onFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
+    // Reset so picking the same file again still fires onChange.
+    event.target.value = ''
     if (!file) return
     setBusy(true)
     setFailed(null)

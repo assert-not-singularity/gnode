@@ -11,7 +11,7 @@ import type {
 
 async function asJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
-    let message = res.statusText
+    let message = res.statusText || `HTTP ${res.status}`
     try {
       const detail = ((await res.json()) as { detail?: unknown }).detail
       if (
@@ -28,7 +28,7 @@ async function asJson<T>(res: Response): Promise<T> {
     } catch {
       // non-JSON error body — keep statusText
     }
-    throw new Error(message)
+    throw new Error(message || `HTTP ${res.status}`)
   }
   return res.json() as Promise<T>
 }
