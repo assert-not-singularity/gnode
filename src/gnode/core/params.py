@@ -57,7 +57,9 @@ def Text(default: str = "", **kw: Any) -> Any:
     return _field(default, "string", **kw)
 
 
-def SeedField(default: int = 0, **kw: Any) -> Any:
+def SeedField(default: int | None = None, **kw: Any) -> Any:
+    """A seed input. Default ``None`` means "derive from the global graph seed";
+    a set value pins this node's seed (plan §5 precedence)."""
     return _field(default, "seed", ge=0, **kw)
 
 
