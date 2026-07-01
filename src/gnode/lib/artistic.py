@@ -10,11 +10,6 @@ import PIL.ImageFile as IF
 IF.LOAD_TRUNCATED_IMAGES = True  # ty: ignore[invalid-assignment]  # Pillow stub types this False
 
 
-def load_lum(path, size=768):
-    im = Image.open(path).convert("L").resize((size, size), Image.Resampling.LANCZOS)
-    return np.asarray(im).astype(np.float32)  # H x W, 0..255
-
-
 def gradient_map(L, stops):
     """Map luminance (0..255) through colour stops [(pos0..1,(r,g,b)),...]."""
     x = L / 255.0
@@ -44,15 +39,6 @@ def warp(ch, amp, freq, phase=0.0, axis=0):
 
 def shift2d(ch, dy, dx):
     return np.roll(np.roll(ch, dy, axis=0), dx, axis=1)
-
-
-def cmy_print(Lc, Lm, Ly):
-    """Subtractive CMY compositing: three luminance plates -> RGB. Where the
-    plates disagree (misregistration), edges bloom into cyan/magenta/yellow."""
-    R = 255 * (Lc / 255.0)
-    G = 255 * (Lm / 255.0)
-    B = 255 * (Ly / 255.0)
-    return np.stack([R, G, B], -1)
 
 
 def pixel_sort(img, low, high, max_span=0, axis=1, coverage=1.0):
@@ -127,15 +113,6 @@ def scanlines(img, strength=0.12, gap=3):
     return out
 
 
-def smoothstep(t):
-    t = np.clip(t, 0, 1)
-    return t * t * (3 - 2 * t)
-
-
-def save(arr, path):
-    Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8)).save(path)
-
-
 # ---------- maximalist / community-style additions ----------
 
 
@@ -180,10 +157,6 @@ def vignette(img, strength=0.5):
     yy, xx = np.mgrid[0:h, 0:w]
     r = np.sqrt(((xx - w / 2) / (w / 2)) ** 2 + ((yy - h / 2) / (h / 2)) ** 2)
     return img * (1 - strength * np.clip(r - 0.35, 0, 1))[..., None]
-
-
-def add_noise(img, amount=12, seed=0):
-    return img + np.random.default_rng(seed).normal(0, amount, img.shape)
 
 
 def byte_corrupt(img, seed, n=4000):
