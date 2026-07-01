@@ -10,10 +10,24 @@ import numpy as np
 from fastapi.testclient import TestClient
 from PIL import Image
 
+from gnode.core.node import Node
+from gnode.core.registry import register_node
+from gnode.core.types import PortType
 from gnode.server.app import create_app
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+@register_node
+class _BadOutput(Node):
+    type = "_test.bad_output"
+    category = "Test"
+    title = "BadOutput"
+    outputs = {"image": PortType.IMAGE}
+
+    def evaluate(self, inputs, params, ctx):
+        return {}  # violates the declared-output contract -> NodeContractError
 
 
 def _png(h: int = 32, w: int = 32) -> bytes:
@@ -25,6 +39,7 @@ def _png(h: int = 32, w: int = 32) -> bytes:
 
 def _upload(client: TestClient) -> str:
     resp = client.post("/api/images", files={"file": ("x.png", _png(), "image/png")})
+    assert resp.status_code == 200, resp.text
     return resp.json()["image_id"]
 
 
@@ -87,6 +102,19 @@ def test_evaluate_invalid_graph_is_400(tmp_path: Path) -> None:
     with TestClient(create_app(tmp_path)) as client:
         resp = client.post("/api/evaluate", json={"graph": graph, "targets": ["v"]})
     assert resp.status_code == 400
+
+
+def test_evaluate_contract_error_is_structured(tmp_path: Path) -> None:
+    # A contract violation must return 200 with a per-node error, not a 500.
+    graph = {
+        "meta": {"resolution": [8, 8]},
+        "nodes": [{"id": "bad", "type": "_test.bad_output", "params": {}}],
+        "edges": [],
+    }
+    with TestClient(create_app(tmp_path)) as client:
+        resp = client.post("/api/evaluate", json={"graph": graph, "targets": ["bad"]})
+    assert resp.status_code == 200
+    assert "bad" in resp.json()["errors"]
 
 
 def test_evaluate_unknown_target_is_400(tmp_path: Path) -> None:

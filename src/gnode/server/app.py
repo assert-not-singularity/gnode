@@ -21,7 +21,7 @@ from fastapi.responses import FileResponse
 from gnode.core import registry
 from gnode.core.context import Context
 from gnode.core.engine import Engine
-from gnode.core.errors import NodeEvalError
+from gnode.core.errors import NodeContractError, NodeEvalError
 from gnode.core.graph import Graph  # noqa: TC001 — FastAPI resolves this annotation at runtime
 from gnode.core.image import decode_image_bytes
 from gnode.core.validation import validate_graph
@@ -138,6 +138,8 @@ def create_app(workspace: str | Path | None = None) -> FastAPI:
             outputs = await loop.run_in_executor(None, engine.evaluate, req.graph, req.targets, ctx)
         except NodeEvalError as exc:
             return EvaluateResponse(errors={exc.node_id: str(exc)})
+        except NodeContractError as exc:
+            return EvaluateResponse(errors={exc.node_id or "graph": str(exc)})
 
         previews = {
             node_id: preview
