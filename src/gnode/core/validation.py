@@ -55,6 +55,7 @@ def validate_graph(graph: Graph) -> ValidationResult:
         except KeyError:
             errors.append(f"node '{node.id}': unknown type '{node.type}'")
     node_ids = set(classes)
+    all_ids = {node.id for node in graph.nodes}
 
     # 3. params validate against each node's Params model
     for node in graph.nodes:
@@ -72,10 +73,14 @@ def validate_graph(graph: Graph) -> ValidationResult:
         (src_node, src_port), (dst_node, dst_port) = edge.src, edge.dst
         src_cls, dst_cls = classes.get(src_node), classes.get(dst_node)
         if src_cls is None:
-            errors.append(f"edge from unknown node '{src_node}'")
+            # Only "unknown node" when the id truly isn't in the graph; a bad
+            # *type* was already reported above, so don't duplicate it here.
+            if src_node not in all_ids:
+                errors.append(f"edge from unknown node '{src_node}'")
             continue
         if dst_cls is None:
-            errors.append(f"edge to unknown node '{dst_node}'")
+            if dst_node not in all_ids:
+                errors.append(f"edge to unknown node '{dst_node}'")
             continue
         if src_port not in src_cls.outputs:
             errors.append(f"node '{src_node}' has no output port '{src_port}'")

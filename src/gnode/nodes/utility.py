@@ -6,6 +6,7 @@ from typing import Literal
 
 import numpy as np
 
+from gnode.core.errors import NodeContractError
 from gnode.core.node import In, Node, NodeParams
 from gnode.core.params import Number, SeedField, Toggle
 from gnode.core.registry import register_node
@@ -42,7 +43,8 @@ class Random(Node):
 
     def evaluate(self, inputs, params, ctx):
         if params.integer:
-            return {"value": int(ctx.rng.integers(int(params.min), int(params.max) + 1))}
+            # Keep the value integral but FLOAT-typed to match the declared port.
+            return {"value": float(int(ctx.rng.integers(int(params.min), int(params.max) + 1)))}
         return {"value": float(ctx.rng.uniform(params.min, params.max))}
 
 
@@ -99,6 +101,9 @@ class MergeChannels(Node):
     outputs = {"image": PortType.IMAGE}
 
     def evaluate(self, inputs, params, ctx):
-        return {
-            "image": np.stack([inputs["r"], inputs["g"], inputs["b"]], axis=2).astype(np.float32)
-        }
+        r, g, b = inputs["r"], inputs["g"], inputs["b"]
+        if not (r.shape == g.shape == b.shape):
+            raise NodeContractError(
+                f"util.merge_channels: channel shapes differ: {r.shape}, {g.shape}, {b.shape}"
+            )
+        return {"image": np.stack([r, g, b], axis=2).astype(np.float32)}

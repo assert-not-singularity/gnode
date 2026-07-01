@@ -6,6 +6,7 @@ from typing import Literal
 
 import numpy as np
 
+from gnode.core.errors import NodeContractError
 from gnode.core.node import In, Node, NodeParams
 from gnode.core.params import Slider
 from gnode.core.registry import register_node
@@ -67,6 +68,8 @@ class Blend(Node):
 
     def evaluate(self, inputs, params, ctx):
         base, top = inputs["a"], inputs["b"]
+        if base.shape != top.shape:
+            raise NodeContractError(f"mask.blend: inputs a {base.shape} and b {top.shape} differ")
         blended = _MODES[params.mode](base, top)
         mixed = base * (1.0 - params.opacity) + blended * params.opacity
         return {"image": apply_mask(base, mixed, inputs.get("mask"))}

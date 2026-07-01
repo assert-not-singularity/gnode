@@ -23,7 +23,12 @@ def build_incoming(graph: Graph) -> Incoming:
     for edge in graph.edges:
         src_node, src_port = edge.src
         dst_node, dst_port = edge.dst
-        incoming.setdefault(dst_node, {})[dst_port] = (src_node, src_port)
+        ports = incoming.setdefault(dst_node, {})
+        if dst_port in ports:
+            # Fail loudly rather than silently pick one edge — an input takes one
+            # wire (validation also flags this; the engine must never mis-evaluate).
+            raise GraphError(f"input '{dst_node}.{dst_port}' has multiple incoming edges")
+        ports[dst_port] = (src_node, src_port)
     return incoming
 
 

@@ -81,7 +81,9 @@ class FreeCode(Node):
             raise RuntimeError("free code must define process(image, inputs, params, np, tk, ctx)")
         result = process(inputs.get("image"), inputs, params.model_dump(), np, _TOOLKIT, ctx)
         if not isinstance(result, dict) or not ({"image", "image_out"} & set(result)):
-            raise RuntimeError("process(...) must return {'image': <array>}")
+            raise RuntimeError(
+                "process(...) must return a dict with an 'image' (or 'image_out') array"
+            )
         out = result.get("image", result.get("image_out"))
         original = inputs.get("image")
         if original is not None:

@@ -84,13 +84,17 @@ class LRUCache:
         with self._lock:
             keylock = self._inflight.setdefault(key, threading.Lock())
         with keylock:
-            hit = self.get(key)
-            if hit is None:
-                hit = factory()
-                self.put(key, hit)
-            with self._lock:
-                self._inflight.pop(key, None)
-            return hit
+            try:
+                hit = self.get(key)
+                if hit is None:
+                    hit = factory()
+                    self.put(key, hit)
+                return hit
+            finally:
+                # Always release the in-flight lock entry, even if factory() raised,
+                # so failed computations don't leak locks unboundedly.
+                with self._lock:
+                    self._inflight.pop(key, None)
 
     def __len__(self) -> int:
         with self._lock:
