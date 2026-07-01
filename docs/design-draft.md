@@ -12,7 +12,9 @@ A visual graph editor where an **input image** starts as a node and flows throug
 **Core principles**
 - Node-based, directed acyclic graph (DAG), pull-based lazy evaluation.
 - Non-destructive: nodes never mutate their inputs, they return new arrays.
-- Deterministic: same graph + same seed ⇒ identical result.
+- Deterministic: same graph + same seed ⇒ identical result. (Caveat: codec-based
+  nodes like JPEG databend are deterministic only *per environment*, and the
+  free-code node only if the user's code is; see `plan.md` §1, §3.7.)
 - Incremental: only "dirty" nodes are recomputed (caching).
 - Extensible: a new node = a new file; registration is automatic.
 - **Free-code node** from day one, so you're not limited to the built-in set.
@@ -103,9 +105,14 @@ class NodeSpec:
 ## 4. Evaluation & Caching Model
 
 - **Pull-based / lazy:** evaluation starts from the requested terminal nodes (`Viewer`, `Save`) and works backward, topologically sorted.
-- **Caching:** each node caches its output dict under a key
-  `hash(node.type, node.params, [upstream_output_hashes], ctx.seed_slice, ctx.resolution)`.
-  If nothing upstream changed, the cache hits. Array hashing e.g. via `xxhash` over the bytes (for large arrays optionally over a downsample, with a small collision risk — decision in §13).
+- **Caching (structural keys):** each node caches its output dict under a
+  *structural* key
+  `hash(node.type, canonical(params), [upstream_structural_keys], resolution, seed?, version-salt)`.
+  Because nodes are pure + deterministic, the key alone identifies the output —
+  **no numpy array hashing is needed**. If nothing upstream changed, the key is
+  unchanged and the cache hits. The one hazard is `canonical()`: a bug there
+  yields a *false hit that returns the wrong image*, so it is hardened and heavily
+  tested (see `plan.md` §3.4, §5).
 - **Dirty propagation:** a param change marks the node + all descendants dirty; a re-run recomputes only those.
 - **Live preview:** while editing a slider, re-evaluate with debounce (as in the existing "Glitch Studio" prototype). Stream previews as downscaled PNGs to node thumbnails and the viewer.
 - **Determinism:** always derive RNG from `ctx.rng_for(node_id)`, never global `np.random` without a seed.
@@ -212,10 +219,15 @@ def process(image, inputs, params, np, tk, ctx):
     return {"image_out": out}      # dict of the declared outputs
 ```
 
-**Sandbox / security:** a local desktop app ⇒ arbitrary code is tolerable, but:
-- Run in a dedicated namespace with whitelisted builtins; no network imports.
-- Optionally `RestrictedPython` or a subprocess with timeout/memory limits (decision in §13).
-- Clear UI warning when importing foreign graphs that contain code nodes.
+**Sandbox / security:** be honest — restricted-`exec` is *not* a real security
+boundary in Python (many known escapes). This is a **trusted-input** model:
+free-code runs arbitrary code and importing an untrusted `.gnode` is dangerous.
+- MVP: run in a dedicated namespace with whitelisted builtins; no network/imports.
+- Phase 2: subprocess isolation with timeout/memory limits (limits blast radius,
+  not marketed as safety).
+- Clear UI warning when importing foreign graphs that contain code nodes; state
+  the trusted-input model in the docs.
+- Determinism does **not** extend to free-code unless the user's code respects it.
 
 ---
 
@@ -245,7 +257,7 @@ def process(image, inputs, params, np, tk, ctx):
 }
 ```
 
-The format is intentionally close to litegraph.js/ComfyUI so an existing editor can be reused with a minimal adapter. A `.gnode` file = this JSON.
+The format is a simple, explicit node/edge JSON (ComfyUI-style in spirit). The React Flow editor maps onto it through a thin adapter — the app owns this schema; it is not tied to any editor library. A `.gnode` file = this JSON.
 
 ---
 
@@ -283,8 +295,8 @@ A second branch shows the multi-output idea: `JPEG Databend.diff` → `Mask from
 ## 11. Tech Stack Suggestion
 
 **Recommendation (fastest path to ComfyUI parity):**
-- **Backend:** Python + **FastAPI** + WebSocket. The node library builds directly on the existing numpy functions (`glitch.py`, `artistic.py`) — most nodes are thin wrappers. Dependencies: `numpy`, `Pillow`, `imageio`; optional `scipy` (Sobel/filters), `xxhash` (cache keys).
-- **Frontend:** **litegraph.js** (what ComfyUI itself uses) for maximum node-editor maturity, *or* **React Flow** / **Rete.js** if React is preferred. Previews as data-URL over WS.
+- **Backend:** Python + **FastAPI**. The node library builds directly on the existing numpy functions (`glitch.py`, `artistic.py`) — most nodes are thin wrappers. Dependencies: `numpy`, `Pillow`, `imageio`; optional `scipy` (Sobel/filters). (Cache keys are structural over small canonical param data, so `hashlib` suffices — no array-hashing library needed.)
+- **Frontend:** → **Decided:** **React Flow** (`@xyflow/react`) + React 19 + Vite + TypeScript. Previews as data-URL over **REST** (`/api/evaluate`, debounced); WebSocket streaming is a later upgrade.
 - **Packaging (optional):** **Tauri** or **Electron** for a desktop app; otherwise `localhost` in the browser is enough.
 
 **Reuse note:** the already-validated functions cover most of the MVP catalog and should serve as the reference implementation of the nodes:
@@ -301,15 +313,24 @@ Load/Save/Viewer, Band Displace, Scanline Shift, Wave Warp, Block Mosh, Pixel Dr
 
 ---
 
-## 13. Open Decisions (please settle before implementation)
+## 13. Decisions (settled — rationale in `plan.md` §1)
 
-1. **IMAGE range:** 0–255 (closer to our functions) vs. 0–1 (numerically cleaner). Suggestion: internally 0–255 float32, convert only at I/O.
-2. **Array hashing for caching:** full byte hash (correct, slower) vs. downsample hash (fast, minimal collision risk).
-3. **Free-code sandbox:** naked exec (fast, unsafe) vs. RestrictedPython vs. subprocess isolation.
-4. **Frontend library:** litegraph.js (ComfyUI parity) vs. React Flow (modern stack, more custom work).
-5. **Mask model:** optional `mask` input on every glitch node vs. a dedicated "apply-with-mask" wrapper node. Suggestion: both — an input on the node, and a wrapper for combinations.
-6. **Resolution handling:** fixed graph resolution (Load rescales) vs. resolution flowing through with resolution-independent nodes.
+1. **IMAGE range:** → **Decided:** internally float32 0–255; convert only at I/O.
+2. **Cache keying:** ~~full byte vs downsample hash~~ → **Decided:** *structural*
+   keying (node type + params + upstream keys + resolution + version salt);
+   **no array hashing** — purity makes it unnecessary (§4).
+3. **Free-code sandbox:** → **Decided:** restricted-exec for MVP, subprocess
+   isolation later; trusted-input model, not a real security boundary (§7).
+4. **Frontend library:** → **Decided:** React Flow (`@xyflow/react`).
+5. **Mask model:** → **Decided:** optional `mask` input on glitch nodes for MVP;
+   an "apply-with-mask" wrapper node later.
+6. **Resolution handling:** → **Decided:** shapes flow with the data;
+   `meta.resolution` is only Load's normalization target / canvas default, not a
+   global invariant (mask/field must match the array they modulate).
 
 ---
 
-*End of draft. Handoff to Claude Code: start with §11 (stack) + §12 (MVP), use the included `glitch.py`/`artistic.py` as node references, then work through §6.*
+*End of draft. The settled build plan, engine architecture, and milestone order
+live in [`plan.md`](plan.md) — start there. This draft remains the spec for the
+data model, node interface, and node catalog (§3, §6); `glitch.py`/`artistic.py`
+in `reference/` are the node reference implementations.*

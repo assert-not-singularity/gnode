@@ -1,0 +1,25 @@
+{
+  "version": "1.0",
+  "meta": { "seed": 7, "resolution": [512, 512] },
+  "nodes": [
+    { "id": "load", "type": "io.load_image", "pos": [40, 200], "params": { "image_id": "sample.png" } },
+    { "id": "grade", "type": "color.gradient_map", "pos": [300, 200], "params": {} },
+    { "id": "databend", "type": "corrupt.jpeg_databend", "pos": [560, 200], "params": { "quality": 88, "n": 42, "seed": 17, "direction": "both" } },
+    { "id": "mosh", "type": "displace.block_mosh", "pos": [820, 200], "params": { "n": 20, "max_shift": 190, "seed": 9 } },
+    { "id": "grain", "type": "corrupt.byte_corrupt", "pos": [1080, 200], "params": { "n": 20000, "seed": 5 } },
+    { "id": "drag", "type": "displace.pixel_drag", "pos": [1340, 200], "params": { "rows_frac": 0.28, "seed": 3 } },
+    { "id": "rgb", "type": "color.channel_shift", "pos": [1600, 200], "params": { "off": 10, "dy": 1 } },
+    { "id": "chroma", "type": "color.chroma_shift", "pos": [1860, 200], "params": { "dx": 8, "dy": 0, "bleed": 1.15 } },
+    { "id": "view", "type": "io.viewer", "pos": [2120, 200], "params": {} }
+  ],
+  "edges": [
+    { "from": ["load", "image"], "to": ["grade", "image"] },
+    { "from": ["grade", "image"], "to": ["databend", "image"] },
+    { "from": ["databend", "image"], "to": ["mosh", "image"] },
+    { "from": ["mosh", "image"], "to": ["grain", "image"] },
+    { "from": ["grain", "image"], "to": ["drag", "image"] },
+    { "from": ["drag", "image"], "to": ["rgb", "image"] },
+    { "from": ["rgb", "image"], "to": ["chroma", "image"] },
+    { "from": ["chroma", "image"], "to": ["view", "image"] }
+  ]
+}

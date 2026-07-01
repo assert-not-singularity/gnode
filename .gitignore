@@ -17,5 +17,13 @@ Thumbs.db
 .idea/
 .vscode/
 
+# Python tooling caches
+.ruff_cache/
+.pytest_cache/
+.ty_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
 # gnode runtime
 *.gnode.cache

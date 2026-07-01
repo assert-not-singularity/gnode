@@ -1,0 +1,67 @@
+[project]
+name = "gnode"
+version = "0.1.0"
+description = "Node-based, glitch-first image editor — headless evaluation engine + node catalog."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.1",
+    "pillow>=10.4",
+    "imageio>=2.34",
+    "pydantic>=2.7",
+]
+
+[project.optional-dependencies]
+scipy = ["scipy>=1.13"]
+
+[project.scripts]
+gnode = "gnode.cli:main"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.6",
+    "ty>=0.0.1a1",
+    "pytest>=8.2",
+    "pytest-cov>=5.0",
+    "hypothesis>=6.100",
+]
+server = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gnode"]
+
+# ── Ruff (lint + format) ──────────────────────────────────────────────────────
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+extend-exclude = ["reference"]   # untouched provenance — not part of the linted codebase
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "PT", "PTH", "TID", "RET", "TC", "ARG", "RUF"]
+# E/F/W pycodestyle+pyflakes · I isort · N naming · UP pyupgrade · B bugbear
+# C4 comprehensions · SIM simplify · PT pytest · PTH pathlib · TID tidy-imports
+# RET returns · TC type-checking-imports · ARG unused-args · RUF ruff-native
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ARG", "RUF012"]             # fixtures injected as args; node metadata dicts
+"src/gnode/nodes/**" = ["RUF012", "ARG002"]  # class-level metadata dicts; uniform evaluate() signature
+"src/gnode/core/params.py" = ["N802"]      # widget-field factories read like types
+# lib/ is vendored/validated numerics — keep real-bug lints (F, E9, most B) but
+# silence style rules so we don't churn the math (short names, int(round()), etc.).
+"src/gnode/lib/**" = ["N", "E741", "E501", "E701", "ARG", "B905", "RUF005", "RUF007", "RUF046", "RUF059", "I001"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["gnode"]
+
+# ── pytest ────────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
