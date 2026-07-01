@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 244" width="880" height="244" font-family="'JetBrains Mono','SFMono-Regular',ui-monospace,Menlo,Consolas,monospace">
+  <defs>
+    <!-- faint scanlines -->
+    <pattern id="scan" width="1" height="4" patternUnits="userSpaceOnUse">
+      <rect width="1" height="1" fill="#ffffff" opacity="0.035"/>
+    </pattern>
+    <!-- the wordmark, fill set by each <use> -->
+    <g id="wm">
+      <text x="440" y="190" text-anchor="middle" font-size="150" font-weight="800" letter-spacing="-4">gnode</text>
+    </g>
+    <!-- displaced slice bands -->
+    <clipPath id="sliceA"><rect x="0" y="96"  width="880" height="26"/></clipPath>
+    <clipPath id="sliceB"><rect x="0" y="150" width="880" height="18"/></clipPath>
+    <clipPath id="sliceC"><rect x="0" y="182" width="880" height="12"/></clipPath>
+  </defs>
+
+  <!-- backdrop -->
+  <rect width="880" height="244" rx="18" fill="#0a0a0d"/>
+  <rect width="880" height="244" rx="18" fill="url(#scan)"/>
+
+  <!-- chromatic aberration: cyan + red copies offset opposite ways -->
+  <use href="#wm" fill="#22e0d6" transform="translate(-7,2)"  style="mix-blend-mode:screen"/>
+  <use href="#wm" fill="#ff2e3e" transform="translate(7,-2)"  style="mix-blend-mode:screen"/>
+  <!-- main body -->
+  <use href="#wm" fill="#ececf0"/>
+
+  <!-- torn slices (shifted horizontally within thin bands) -->
+  <use href="#wm" fill="#ececf0" clip-path="url(#sliceA)" transform="translate(22,0)"/>
+  <use href="#wm" fill="#ff2e3e" clip-path="url(#sliceA)" transform="translate(29,0)" style="mix-blend-mode:screen"/>
+  <use href="#wm" fill="#ececf0" clip-path="url(#sliceB)" transform="translate(-16,0)"/>
+  <use href="#wm" fill="#22e0d6" clip-path="url(#sliceB)" transform="translate(-23,0)" style="mix-blend-mode:screen"/>
+  <use href="#wm" fill="#ececf0" clip-path="url(#sliceC)" transform="translate(10,0)"/>
+
+  <!-- filename tag -->
+  <text x="34" y="46" font-size="16" font-weight="700" letter-spacing="2" fill="#22e0d6">.gnode</text>
+  <circle cx="846" cy="40" r="5" fill="#ff2e3e"/>
+</svg>
