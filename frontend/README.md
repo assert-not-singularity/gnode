@@ -1,32 +1,37 @@
-# React + TypeScript + Vite
+# gnode frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The node-based editor UI for [gnode](../README.md) — React 19 + Vite +
+TypeScript + [React Flow](https://reactflow.dev/) (`@xyflow/react`). It talks to
+the FastAPI backend (Milestone 2) over `/api/*`.
 
-Currently, two official plugins are available:
+## Develop
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm ci                 # or: make front-install
+npm run dev            # Vite dev server on http://localhost:5173
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+The dev server proxies `/api/*` to the backend on `http://127.0.0.1:8080`, so run
+the backend alongside it:
+
+```bash
+# from the repo root
+make serve             # uvicorn on 127.0.0.1:8080
+```
+
+## Quality gate
+
+```bash
+npm run check          # biome check + tsc -b   (or: make front-check)
+npm run build          # tsc -b && vite build
+```
+
+- **Biome** — lint + format (`npm run format` writes fixes).
+- **`tsc`** — type checking (project references: `src/` + tooling).
+
+## Layout
+
+- `src/api/client.ts` — typed fetch wrappers for the backend API.
+- `src/types.ts` — TS types mirroring the backend contract (catalog + `.gnode`).
+- `src/hooks/` — data hooks (e.g. `useNodes` loads the node catalog).
+- `src/App.tsx` — app shell (canvas, palette, config panel land across M3 WI-2+).

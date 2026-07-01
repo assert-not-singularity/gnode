@@ -58,7 +58,7 @@ serve:
 
 .PHONY: front-install front-dev front-build front-check
 front-install:
-	cd frontend && npm install
+	cd frontend && npm ci
 
 front-dev:
 	cd frontend && npm run dev

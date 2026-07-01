@@ -6,10 +6,10 @@ export default function App() {
   const { nodes, loading, error } = useNodes()
 
   const byCategory = useMemo(() => {
-    const map = new Map<string, string[]>()
+    const map = new Map<string, { type: string; title: string }[]>()
     for (const node of nodes) {
       const list = map.get(node.category) ?? []
-      list.push(node.title)
+      list.push({ type: node.type, title: node.title })
       map.set(node.category, list)
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b))
@@ -37,12 +37,12 @@ export default function App() {
               {nodes.length} nodes across {byCategory.length} categories
             </p>
             <div className="catalog">
-              {byCategory.map(([category, titles]) => (
+              {byCategory.map(([category, items]) => (
                 <section key={category} className="cat">
                   <h2>{category}</h2>
                   <ul>
-                    {titles.map((title) => (
-                      <li key={title}>{title}</li>
+                    {items.map((node) => (
+                      <li key={node.type}>{node.title}</li>
                     ))}
                   </ul>
                 </section>
