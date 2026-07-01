@@ -11,14 +11,24 @@ import type {
 
 async function asJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
-    let detail = res.statusText
+    let message = res.statusText
     try {
-      const body = (await res.json()) as { detail?: unknown }
-      if (body?.detail) detail = JSON.stringify(body.detail)
+      const detail = ((await res.json()) as { detail?: unknown }).detail
+      if (
+        detail &&
+        typeof detail === 'object' &&
+        Array.isArray((detail as { errors?: unknown }).errors)
+      ) {
+        message = (detail as { errors: string[] }).errors.join('; ')
+      } else if (typeof detail === 'string') {
+        message = detail
+      } else if (detail) {
+        message = JSON.stringify(detail)
+      }
     } catch {
       // non-JSON error body — keep statusText
     }
-    throw new Error(`${res.status}: ${detail}`)
+    throw new Error(message)
   }
   return res.json() as Promise<T>
 }
