@@ -127,14 +127,22 @@ class BlockMosh(Node):
 
     def evaluate(self, inputs, params, ctx):
         image = inputs["image"]
-        out = artistic.block_mosh(
-            image,
-            seed=ctx.seed,
-            n=params.n,
-            max_h=params.max_h,
-            max_w=params.max_w,
-            max_shift=params.max_shift,
-        )
+        h, w, _ = image.shape
+        # Clamp block dims to the frame: block_mosh needs blocks smaller than the
+        # image, so a large max_w/max_h on a small image otherwise broadcast-crashes.
+        max_h = min(params.max_h, h)
+        max_w = min(params.max_w, w)
+        if max_h <= 8 or max_w <= 40:
+            out = image  # image too small to mosh — no-op
+        else:
+            out = artistic.block_mosh(
+                image,
+                seed=ctx.seed,
+                n=params.n,
+                max_h=max_h,
+                max_w=max_w,
+                max_shift=params.max_shift,
+            )
         return {"image": apply_mask(image, out, inputs.get("mask"))}
 
 
