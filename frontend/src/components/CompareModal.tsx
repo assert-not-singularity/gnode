@@ -31,13 +31,7 @@ export function CompareModal({
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={`${title} preview`}>
-      <button
-        type="button"
-        className="modal-scrim"
-        onClick={onClose}
-        aria-label="Close preview"
-        tabIndex={-1}
-      />
+      <button type="button" className="modal-scrim" onClick={onClose} aria-label="Close preview" />
       <div className="modal-card">
         <div className="modal-head">
           <h3>{title}</h3>

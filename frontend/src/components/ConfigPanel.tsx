@@ -59,7 +59,7 @@ export function ConfigPanel({
       </div>
       {preview && (
         <div className="config-actions">
-          <button type="button" className="gm-btn" onClick={onCompare}>
+          <button type="button" className="gm-btn" onClick={onCompare} disabled={!onCompare}>
             ⤢ Compare
           </button>
           <a className="gm-btn" href={preview.data_url} download={`${nodeId}.png`}>

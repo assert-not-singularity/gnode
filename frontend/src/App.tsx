@@ -71,15 +71,22 @@ function Editor() {
   const { screenToFlowPosition } = useReactFlow()
   const canvasRef = useRef<HTMLDivElement>(null)
 
+  const toastTimers = useRef<number[]>([])
   const notify = useCallback((message: string, kind: 'info' | 'error' = 'info') => {
     const id = Date.now() + Math.random()
     setToasts((current) => [...current, { id, message, kind }])
-    setTimeout(() => setToasts((current) => current.filter((t) => t.id !== id)), 4000)
+    const timer = window.setTimeout(() => {
+      setToasts((current) => current.filter((t) => t.id !== id))
+      toastTimers.current = toastTimers.current.filter((t) => t !== timer)
+    }, 4000)
+    toastTimers.current.push(timer)
   }, [])
   const dismissToast = useCallback(
     (id: number) => setToasts((current) => current.filter((t) => t.id !== id)),
     [],
   )
+  // Clear any pending toast timers on unmount (no setState after teardown).
+  useEffect(() => () => toastTimers.current.forEach(clearTimeout), [])
 
   const addNode = useCallback(
     (descriptor: NodeDescriptor, position: { x: number; y: number }) => {

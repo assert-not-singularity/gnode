@@ -18,7 +18,13 @@ function downloadText(filename: string, text: string, type: string) {
   a.href = url
   a.download = filename
   a.click()
-  URL.revokeObjectURL(url)
+  // Revoke on the next tick so the browser has time to start the download.
+  setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+/** Ensure a single `.gnode` extension (avoids `name.gnode.gnode`). */
+function withGnodeExt(name: string): string {
+  return name.endsWith('.gnode') ? name : `${name}.gnode`
 }
 
 /** Header controls for graph persistence: New, name + Save, Load, and export. */
@@ -42,7 +48,7 @@ export function GraphMenu({ getGraph, onLoad, onNew, hasNodes, notify }: GraphMe
       notify('Enter a name before saving', 'error')
       return
     }
-    const filename = trimmed.endsWith('.gnode') ? trimmed : `${trimmed}.gnode`
+    const filename = withGnodeExt(trimmed)
     try {
       const result = await saveGraph(filename, getGraph())
       notify(`Saved ${result.filename}`)
@@ -71,8 +77,9 @@ export function GraphMenu({ getGraph, onLoad, onNew, hasNodes, notify }: GraphMe
   }
 
   const onExport = () => {
-    const trimmed = name.trim() || 'untitled'
-    downloadText(`${trimmed}.gnode`, JSON.stringify(getGraph(), null, 2), 'application/json')
+    const filename = withGnodeExt(name.trim() || 'untitled')
+    downloadText(filename, JSON.stringify(getGraph(), null, 2), 'application/json')
+    notify(`Exported ${filename}`)
   }
 
   return (
