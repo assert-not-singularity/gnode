@@ -109,7 +109,7 @@ One gate covers both halves of the stack:
 
 ```bash
 make check          # backend: ruff check + ruff format --check + ty + pytest
-make front-check    # frontend: biome check + tsc --noEmit
+make front-check    # frontend: biome check + tsc -b
 ```
 
 **Backend** — `uv` (env/deps), `ruff` (lint + format), `ty` (types),
@@ -119,4 +119,5 @@ make front-check    # frontend: biome check + tsc --noEmit
 
 ## License
 
-Open source; license TBD.
+To be determined — gnode will be released under an open-source license. Until a
+`LICENSE` file is added, no license is granted and all rights are reserved.
