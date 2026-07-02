@@ -17,14 +17,17 @@ import '@xyflow/react/dist/style.css'
 import { type DragEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { evaluateGraph } from './api/client'
+import { CompareModal } from './components/CompareModal'
 import { ConfigPanel } from './components/ConfigPanel'
 import { GlitchNode, type GlitchNodeType } from './components/GlitchNode'
+import { GraphMenu } from './components/GraphMenu'
 import { Palette } from './components/Palette'
+import { type Toast, Toasts } from './components/Toasts'
 import { Toolbar } from './components/Toolbar'
 import { PreviewContext } from './contexts'
-import { toGnodeGraph } from './graph'
+import { fromGnodeGraph, toGnodeGraph } from './graph'
 import { useNodes } from './hooks/useNodes'
-import type { NodeDescriptor, NodePreview } from './types'
+import type { GnodeGraph, NodeDescriptor, NodePreview } from './types'
 
 const nodeTypes = { glitchNode: GlitchNode }
 const DEBOUNCE_MS = 350
@@ -32,6 +35,22 @@ const DEBOUNCE_MS = 350
 /** Short base name for a node id, e.g. "displace.band" -> "band". */
 function baseName(type: string): string {
   return type.split('.').pop() ?? type
+}
+
+/** The id of the node feeding `nodeId`'s first connected IMAGE input, if any. */
+function primaryImageSource(
+  nodeId: string,
+  nodes: GlitchNodeType[],
+  edges: Edge[],
+): string | undefined {
+  const node = nodes.find((n) => n.id === nodeId)
+  if (!node) return undefined
+  for (const port of node.data.descriptor.inputs) {
+    if (port.type !== 'IMAGE') continue
+    const edge = edges.find((e) => e.target === nodeId && e.targetHandle === port.name)
+    if (edge) return edge.source
+  }
+  return undefined
 }
 
 function Editor() {
@@ -47,8 +66,27 @@ function Editor() {
   const [nodeErrors, setNodeErrors] = useState<Record<string, string>>({})
   const [issues, setIssues] = useState<string[]>([])
   const [status, setStatus] = useState('')
+  const [toasts, setToasts] = useState<Toast[]>([])
+  const [compareId, setCompareId] = useState<string | null>(null)
   const { screenToFlowPosition } = useReactFlow()
   const canvasRef = useRef<HTMLDivElement>(null)
+
+  const toastTimers = useRef<number[]>([])
+  const notify = useCallback((message: string, kind: 'info' | 'error' = 'info') => {
+    const id = Date.now() + Math.random()
+    setToasts((current) => [...current, { id, message, kind }])
+    const timer = window.setTimeout(() => {
+      setToasts((current) => current.filter((t) => t.id !== id))
+      toastTimers.current = toastTimers.current.filter((t) => t !== timer)
+    }, 4000)
+    toastTimers.current.push(timer)
+  }, [])
+  const dismissToast = useCallback(
+    (id: number) => setToasts((current) => current.filter((t) => t.id !== id)),
+    [],
+  )
+  // Clear any pending toast timers on unmount (no setState after teardown).
+  useEffect(() => () => toastTimers.current.forEach(clearTimeout), [])
 
   const addNode = useCallback(
     (descriptor: NodeDescriptor, position: { x: number; y: number }) => {
@@ -186,14 +224,49 @@ function Editor() {
     }
   }, [evalKey])
 
+  const getGraph = useCallback(
+    () => toGnodeGraph(nodes, edges, seed, resolution),
+    [nodes, edges, seed, resolution],
+  )
+
+  const onLoadGraph = useCallback(
+    (graph: GnodeGraph) => {
+      const loaded = fromGnodeGraph(graph, byType)
+      setNodes(loaded.nodes)
+      setEdges(loaded.edges)
+      setSeed(loaded.seed)
+      setResolution(loaded.resolution)
+      setSelectedId(null)
+      if (loaded.skipped.length > 0) {
+        const unique = [...new Set(loaded.skipped)].join(', ')
+        notify(`Skipped unknown node types: ${unique}`, 'error')
+      }
+    },
+    [byType, setNodes, setEdges, notify],
+  )
+
+  const onNewGraph = useCallback(() => {
+    setNodes([])
+    setEdges([])
+    setSelectedId(null)
+  }, [setNodes, setEdges])
+
   const previewState = useMemo(() => ({ previews, errors: nodeErrors }), [previews, nodeErrors])
   const selected = selectedId ? nodes.find((n) => n.id === selectedId) : undefined
+  const compareBeforeId = compareId ? primaryImageSource(compareId, nodes, edges) : undefined
 
   return (
     <div className="app">
       <header className="app-header">
         <span className="app-logo">⬡</span>
         <span className="app-title">gnode</span>
+        <GraphMenu
+          getGraph={getGraph}
+          onLoad={onLoadGraph}
+          onNew={onNewGraph}
+          hasNodes={nodes.length > 0}
+          notify={notify}
+        />
         <Toolbar
           seed={seed}
           onSeed={setSeed}
@@ -248,9 +321,22 @@ function Editor() {
             params={selected.data.params}
             onChange={(params) => setParams(selected.id, params)}
             onClose={() => setSelectedId(null)}
+            preview={previews[selected.id]}
+            onCompare={() => setCompareId(selected.id)}
           />
         )}
       </div>
+      {compareId && previews[compareId] && (
+        <CompareModal
+          title={compareId}
+          after={previews[compareId]}
+          afterLabel={compareId}
+          before={compareBeforeId ? previews[compareBeforeId] : undefined}
+          beforeLabel={compareBeforeId}
+          onClose={() => setCompareId(null)}
+        />
+      )}
+      <Toasts toasts={toasts} onDismiss={dismissToast} />
     </div>
   )
 }
