@@ -1,6 +1,6 @@
 import { type ChangeEvent, useState } from 'react'
 import { uploadImage } from '../api/client'
-import type { JsonSchema, JsonSchemaProperty } from '../types'
+import type { JsonSchema, JsonSchemaProperty, NodePreview } from '../types'
 
 interface ConfigPanelProps {
   nodeId: string
@@ -9,6 +9,9 @@ interface ConfigPanelProps {
   params: Record<string, unknown>
   onChange: (params: Record<string, unknown>) => void
   onClose: () => void
+  /** The node's last rendered output, if any (enables PNG export + compare). */
+  preview?: NodePreview
+  onCompare?: () => void
 }
 
 /** Side panel that renders a node's params from its JSON Schema + widget hints
@@ -20,6 +23,8 @@ export function ConfigPanel({
   params,
   onChange,
   onClose,
+  preview,
+  onCompare,
 }: ConfigPanelProps) {
   const properties = schema.properties ?? {}
   const update = (key: string, value: unknown) => onChange({ ...params, [key]: value })
@@ -52,6 +57,16 @@ export function ConfigPanel({
           />
         ))}
       </div>
+      {preview && (
+        <div className="config-actions">
+          <button type="button" className="gm-btn" onClick={onCompare}>
+            ⤢ Compare
+          </button>
+          <a className="gm-btn" href={preview.data_url} download={`${nodeId}.png`}>
+            ⤓ PNG
+          </a>
+        </div>
+      )}
     </aside>
   )
 }
