@@ -506,3 +506,11 @@
   max-width: 220px;
   white-space: normal;
 }
+.node-info {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.68rem;
+  color: #94a3b8;
+  border-top: 1px solid #1e293b;
+  max-width: 220px;
+  white-space: normal;
+}

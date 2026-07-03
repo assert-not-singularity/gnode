@@ -6,6 +6,12 @@ import type { NodePreview } from './types'
 export interface PreviewState {
   previews: Record<string, NodePreview>
   errors: Record<string, string>
+  /** Node id -> unmet required input port names (not yet wired up; not an error). */
+  incomplete: Record<string, string[]>
 }
 
-export const PreviewContext = createContext<PreviewState>({ previews: {}, errors: {} })
+export const PreviewContext = createContext<PreviewState>({
+  previews: {},
+  errors: {},
+  incomplete: {},
+})

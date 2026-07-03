@@ -74,3 +74,45 @@ export function fromGnodeGraph(
   const [w, h] = graph.meta.resolution
   return { nodes, edges, seed: graph.meta.seed, resolution: [w, h], skipped }
 }
+
+export interface Incompleteness {
+  /** Node ids missing a required connection (or depending on one that is) —
+   * excluded from what gets submitted to `/api/evaluate`. */
+  excluded: Set<string>
+  /** For each excluded node, the required input port names still unmet. */
+  missing: Record<string, string[]>
+}
+
+/** A freshly-dropped or not-yet-wired node is an expected, transient canvas
+ * state, not a broken graph — find nodes with an unmet *required* input (and
+ * anything depending on them) so they can be excluded from evaluation and
+ * shown as an informational badge instead of failing the whole graph. */
+export function findIncomplete(nodes: GlitchNodeType[], edges: Edge[]): Incompleteness {
+  const unmetRequired = (node: GlitchNodeType, excluded: Set<string>) =>
+    node.data.descriptor.inputs
+      .filter((port) => port.required)
+      .filter((port) => {
+        const edge = edges.find((e) => e.target === node.id && e.targetHandle === port.name)
+        return !edge || excluded.has(edge.source)
+      })
+
+  const excluded = new Set<string>()
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const node of nodes) {
+      if (excluded.has(node.id)) continue
+      if (unmetRequired(node, excluded).length > 0) {
+        excluded.add(node.id)
+        changed = true
+      }
+    }
+  }
+
+  const missing: Record<string, string[]> = {}
+  for (const node of nodes) {
+    if (!excluded.has(node.id)) continue
+    missing[node.id] = unmetRequired(node, excluded).map((port) => port.name)
+  }
+  return { excluded, missing }
+}
