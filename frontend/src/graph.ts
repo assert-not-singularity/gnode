@@ -74,3 +74,58 @@ export function fromGnodeGraph(
   const [w, h] = graph.meta.resolution
   return { nodes, edges, seed: graph.meta.seed, resolution: [w, h], skipped }
 }
+
+export interface MissingPort {
+  port: string
+  /** "unwired": the port has no edge at all. "upstream": it has one, but the
+   * source node is itself excluded (still incomplete somewhere upstream). */
+  reason: 'unwired' | 'upstream'
+}
+
+export interface Incompleteness {
+  /** Node ids missing a required connection (or depending on one that is) —
+   * excluded from what gets submitted to `/api/evaluate`. */
+  excluded: Set<string>
+  /** For each excluded node, the required input ports still unmet. */
+  missing: Record<string, MissingPort[]>
+}
+
+/** A freshly-dropped or not-yet-wired node is an expected, transient canvas
+ * state, not a broken graph — find nodes with an unmet *required* input (and
+ * anything depending on them) so they can be excluded from evaluation and
+ * shown as an informational badge instead of failing the whole graph. */
+export function findIncomplete(nodes: GlitchNodeType[], edges: Edge[]): Incompleteness {
+  const edgeByTarget = new Map<string, Edge>()
+  for (const e of edges) {
+    if (e.targetHandle) edgeByTarget.set(`${e.target}.${e.targetHandle}`, e)
+  }
+
+  const unmetRequired = (node: GlitchNodeType, excluded: Set<string>): MissingPort[] =>
+    node.data.descriptor.inputs
+      .filter((port) => port.required)
+      .flatMap((port): MissingPort[] => {
+        const edge = edgeByTarget.get(`${node.id}.${port.name}`)
+        if (!edge) return [{ port: port.name, reason: 'unwired' as const }]
+        return excluded.has(edge.source) ? [{ port: port.name, reason: 'upstream' as const }] : []
+      })
+
+  const excluded = new Set<string>()
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const node of nodes) {
+      if (excluded.has(node.id)) continue
+      if (unmetRequired(node, excluded).length > 0) {
+        excluded.add(node.id)
+        changed = true
+      }
+    }
+  }
+
+  const missing: Record<string, MissingPort[]> = {}
+  for (const node of nodes) {
+    if (!excluded.has(node.id)) continue
+    missing[node.id] = unmetRequired(node, excluded)
+  }
+  return { excluded, missing }
+}

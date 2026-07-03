@@ -17,9 +17,10 @@ export type GlitchNodeType = Node<GlitchNodeData, 'glitchNode'>
  * preview thumbnail / error border from the last evaluate. */
 export function GlitchNode({ id, data, selected }: NodeProps<GlitchNodeType>) {
   const { descriptor, label } = data
-  const { previews, errors } = useContext(PreviewContext)
+  const { previews, errors, incomplete } = useContext(PreviewContext)
   const preview = previews[id]
   const error = errors[id]
+  const missing = incomplete[id]
 
   return (
     <div
@@ -68,6 +69,17 @@ export function GlitchNode({ id, data, selected }: NodeProps<GlitchNodeType>) {
         />
       )}
       {error && <div className="node-error">{error}</div>}
+      {!error && missing && missing.length > 0 && (
+        <div className="node-info">
+          {missing
+            .map((m) =>
+              m.reason === 'unwired'
+                ? `not connected: ${m.port}`
+                : `waiting on upstream: ${m.port}`,
+            )
+            .join('; ')}
+        </div>
+      )}
     </div>
   )
 }

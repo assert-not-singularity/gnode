@@ -25,7 +25,7 @@ import { Palette } from './components/Palette'
 import { type Toast, Toasts } from './components/Toasts'
 import { Toolbar } from './components/Toolbar'
 import { PreviewContext } from './contexts'
-import { fromGnodeGraph, toGnodeGraph } from './graph'
+import { findIncomplete, fromGnodeGraph, toGnodeGraph } from './graph'
 import { useNodes } from './hooks/useNodes'
 import type { GnodeGraph, NodeDescriptor, NodePreview } from './types'
 
@@ -201,8 +201,21 @@ function Editor() {
     setStatus('evaluating')
     const timer = setTimeout(() => {
       const { nodes: ns, edges: es, seed: sd, resolution: res } = graphRef.current
-      const targets = ns.map((n) => n.id)
-      evaluateGraph(toGnodeGraph(ns, es, sd, res), targets)
+      // Nodes with an unwired required input are a normal WIP state, not a
+      // broken graph — exclude them (and anything depending on them) from
+      // what's submitted so the rest of the graph keeps rendering.
+      const { excluded } = findIncomplete(ns, es)
+      const included = ns.filter((n) => !excluded.has(n.id))
+      if (included.length === 0) {
+        setPreviews({})
+        setNodeErrors({})
+        setIssues([])
+        setStatus('')
+        return
+      }
+      const includedEdges = es.filter((e) => !excluded.has(e.source) && !excluded.has(e.target))
+      const targets = included.map((n) => n.id)
+      evaluateGraph(toGnodeGraph(included, includedEdges, sd, res), targets)
         .then((result) => {
           if (stale) return
           setPreviews(result.previews)
@@ -251,7 +264,12 @@ function Editor() {
     setSelectedId(null)
   }, [setNodes, setEdges])
 
-  const previewState = useMemo(() => ({ previews, errors: nodeErrors }), [previews, nodeErrors])
+  // Live (non-debounced) so badges update the instant a wire is connected.
+  const incomplete = useMemo(() => findIncomplete(nodes, edges), [nodes, edges])
+  const previewState = useMemo(
+    () => ({ previews, errors: nodeErrors, incomplete: incomplete.missing }),
+    [previews, nodeErrors, incomplete],
+  )
   const selected = selectedId ? nodes.find((n) => n.id === selectedId) : undefined
   const compareBeforeId = compareId ? primaryImageSource(compareId, nodes, edges) : undefined
 
