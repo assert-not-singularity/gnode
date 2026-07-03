@@ -305,6 +305,7 @@ function Editor() {
               defaultViewport={{ x: 0, y: 0, zoom: 1 }}
               minZoom={0.2}
               deleteKeyCode={['Backspace', 'Delete']}
+              colorMode="dark"
             >
               <Background gap={16} size={1} color="#1e293b" />
               <Controls />
