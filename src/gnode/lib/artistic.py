@@ -48,7 +48,7 @@ def pixel_sort(img, low, high, max_span=0, axis=1, coverage=1.0):
     a = img if axis == 1 else np.swapaxes(img, 0, 1)
     out = a.copy()
     h, w = a.shape[:2]
-    lum = a.mean(2)
+    lum = a.mean(2) / 255.0
     c = h / 2
     y0, y1 = int(c - coverage * h / 2), int(c + coverage * h / 2)
     for y in range(max(0, y0), min(h, y1)):
