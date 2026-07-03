@@ -124,6 +124,19 @@ def test_node_matches_lib_reference(
     assert np.array_equal(got, expected), f"{node_type} diverged from its lib reference"
 
 
+def test_pixel_sort_is_not_a_noop() -> None:
+    # Regression guard: the low/high thresholds are normalized 0..1, but
+    # luminance is 0..255 (IMAGE convention) — a missing `/ 255.0` silently
+    # excludes almost every pixel from the sortable band, so the node just
+    # returns the input unchanged. `test_node_matches_lib_reference` alone
+    # can't catch this: it compares the node to the same lib function it
+    # wraps, so both sides go stale together.
+    img = make_image(seed=11, h=RH, w=RW)
+    node = get_node("sort.pixel_sort")
+    got = _run(node, {}, img, seed=SEED)
+    assert not np.array_equal(got, img), "pixel_sort must not be a no-op on real image data"
+
+
 def test_split_cmy_mode_matches_reference() -> None:
     # The non-default branch of color.split also maps 1:1 to a lib function.
     img = make_image(seed=12, h=RH, w=RW)

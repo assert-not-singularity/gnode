@@ -42,13 +42,15 @@ def shift2d(ch, dy, dx):
 
 
 def pixel_sort(img, low, high, max_span=0, axis=1, coverage=1.0):
-    """Sort pixels by luminance within threshold-masked spans. axis=1 sorts
-    along rows (horizontal), axis=0 along columns (vertical). coverage limits
-    to a centred band on the perpendicular axis."""
+    """Sort pixels by luminance within threshold-masked spans. ``img`` is
+    0..255 (gnode's IMAGE convention); ``low``/``high`` are normalized 0..1
+    thresholds compared against ``luminance / 255``. axis=1 sorts along rows
+    (horizontal), axis=0 along columns (vertical). coverage limits to a
+    centred band on the perpendicular axis."""
     a = img if axis == 1 else np.swapaxes(img, 0, 1)
     out = a.copy()
     h, w = a.shape[:2]
-    lum = a.mean(2)
+    lum = a.mean(2) / 255.0
     c = h / 2
     y0, y1 = int(c - coverage * h / 2), int(c + coverage * h / 2)
     for y in range(max(0, y0), min(h, y1)):
