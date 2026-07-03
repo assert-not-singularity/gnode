@@ -1,4 +1,5 @@
 import { createContext } from 'react'
+import type { MissingPort } from './graph'
 import type { NodePreview } from './types'
 
 /** Per-node evaluate results, read by GlitchNode to show a thumbnail / error
@@ -6,8 +7,8 @@ import type { NodePreview } from './types'
 export interface PreviewState {
   previews: Record<string, NodePreview>
   errors: Record<string, string>
-  /** Node id -> unmet required input port names (not yet wired up; not an error). */
-  incomplete: Record<string, string[]>
+  /** Node id -> unmet required input ports (not yet wired up; not an error). */
+  incomplete: Record<string, MissingPort[]>
 }
 
 export const PreviewContext = createContext<PreviewState>({
